@@ -1,0 +1,153 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Document ID: {uid}
+    // Fields:
+    //   - email: string (required, email format)
+    //   - role: string (required, 'admin' | 'user')
+    //   - displayName: string (required)
+    //
+    // Collection: tasks
+    // Document ID: {taskId}
+    // Fields:
+    //   - title: string (required)
+    //   - assignedToEmails: list (required, list of emails)
+    //   - status: string (required, 'pending' | 'completed')
+    //   - isArchived: bool (optional)
+    //
+    // Collection: vehicles
+    // Document ID: {vehicleId}
+    // Fields:
+    //   - plateNo: string (required)
+    //   - brand: string (required)
+    //   - model: string (required)
+    //   - owner: string (optional)
+    //   - firstInspectionDate: string (optional, date format)
+    //   - firstInspectionApproved: bool (optional)
+    //   - repeatInspectionDate: string (optional, date format)
+    //   - repeatInspectionReason: string (optional)
+    //
+    // Collection: taxCalendarEntries
+    // Document ID: {entryId}
+    // Fields:
+    //   - type: string (required)
+    //   - declarationDeadline: string (required, ISO date)
+    //   - paymentDeadline: string (required, ISO date)
+    //
+    // Collection: taxSubmissions
+    // Document ID: {submissionId}
+    // Fields:
+    //   - userId: string (required)
+    //   - taxType: string (required)
+    //   - period: string (required, YYYY-MM)
+    //   - isSubmitted: bool (required)
+    //   - amount: number (optional)
+    //
+    // ===============================================================
+
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && 
+        (request.auth.token.email.lower() == "muhittinoz.ogs@gmail.com" ||
+         (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'));
+    }
+
+    function isValidCompany(data) {
+      return data.name is string && data.name.size() > 0 && data.name.size() < 200 &&
+             data.title is string && data.title.size() > 0 && data.title.size() < 500 &&
+             data.taxNo is string && data.taxNo.size() > 0 && data.taxNo.size() < 50 &&
+             (!('sgkNo' in data) || data.sgkNo is string) &&
+             (!('address' in data) || data.address is string) &&
+             (!('phone' in data) || data.phone is string) &&
+             (!('email' in data) || data.email is string) &&
+             (!('signatory' in data) || data.signatory is string);
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAssignedTo() {
+      return isAuthenticated() && request.auth.token.email in resource.data.assignedToEmails;
+    }
+
+    function isValidVehicle(data) {
+      return data.plateNo is string && data.plateNo.size() > 0 &&
+             data.brand is string && data.brand.size() > 0 &&
+             data.model is string && data.model.size() > 0 &&
+             (!('modelYear' in data) || data.modelYear is string) &&
+             (!('registrationSerialNo' in data) || data.registrationSerialNo is string) &&
+             (!('owner' in data) || data.owner is string) &&
+             (!('firstInspectionDate' in data) || data.firstInspectionDate is string) &&
+             (!('repeatInspectionDate' in data) || data.repeatInspectionDate is string) &&
+             (!('repeatInspectionReason' in data) || data.repeatInspectionReason is string);
+    }
+
+    // User profiles
+    match /users/{uid} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin() || isOwner(uid);
+    }
+
+    // Tasks
+    match /tasks/{taskId} {
+      allow read: if isAuthenticated();
+      allow create: if isAdmin();
+      allow update: if isAdmin() || (isAssignedTo() && !resource.data.isArchived);
+      allow delete: if isAdmin();
+    }
+
+    // Vehicles
+    match /vehicles/{vehicleId} {
+      allow read: if isAuthenticated();
+      allow create: if isAdmin() && isValidVehicle(request.resource.data);
+      allow delete: if isAdmin();
+      allow update: if (isAdmin() && isValidVehicle(request.resource.data)) || (
+        isAuthenticated() &&
+        isValidVehicle(request.resource.data) &&
+        // If approved, only admin can change firstInspectionDate
+        (!('firstInspectionApproved' in resource.data) || resource.data.firstInspectionApproved == false || 
+         request.resource.data.firstInspectionDate == resource.data.firstInspectionDate) &&
+        // If repeatInspectionDate is provided, repeatInspectionReason must be provided
+        (!('repeatInspectionDate' in request.resource.data) || request.resource.data.repeatInspectionDate == null || 
+         ('repeatInspectionReason' in request.resource.data) && request.resource.data.repeatInspectionReason != null && request.resource.data.repeatInspectionReason != "")
+      );
+    }
+
+    // Tax Calendar Settings
+    match /settings/taxCalendar {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    // Tax Calendar Entries
+    match /taxCalendarEntries/{entryId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    // Tax Submissions
+    match /taxSubmissions/{submissionId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow delete: if isAdmin();
+    }
+
+    // Companies
+    match /companies/{companyId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+  }
+}
