@@ -21,26 +21,27 @@ export default function Login({}: LoginProps) {
     setLoading(true);
     try {
       const provider = new GoogleAuthProvider();
-      const result = await signInWithPopup(auth, provider);
-      const user = result.user;
-
-      // Check if this user exists in our Firestore users collection
-      const q = query(collection(db, 'users'), where('email', '==', user.email));
-      const querySnapshot = await getDocs(q);
-
-      if (!querySnapshot.empty) {
-        // Auth state listener in App.tsx will handle the redirect
-        return;
-      } else if (user.email === 'muhittinoz.ogs@gmail.com') {
-        // Auth state listener in App.tsx will handle the redirect
-        return;
-      } else {
-        setError('Hesabınız henüz yönetici tarafından onaylanmamış. Lütfen yöneticinizle iletişime geçin.');
-        await auth.signOut();
-      }
+      await signInWithPopup(auth, provider);
+      // Auth state listener in App.tsx will handle the redirect and authorization check
     } catch (err: any) {
       console.error('Google login error:', err);
-      setError('Google ile giriş yapılırken bir hata oluştu.');
+      let errorMessage = 'Google ile giriş yapılırken bir hata oluştu.';
+      
+      if (err.code === 'auth/popup-closed-by-user') {
+        errorMessage = 'Google giriş popup\'ı kapatıldı. Lütfen tekrar deneyin.';
+      } else if (err.code === 'auth/cancelled-popup-request') {
+        errorMessage = 'Google giriş isteği iptal edildi.';
+      } else if (err.code === 'auth/popup-blocked') {
+        errorMessage = 'Popup engellendi. Lütfen popup engelleyicisini devre dışı bırakın.';
+      } else if (err.code === 'auth/operation-not-allowed') {
+        errorMessage = 'Google girişi bu proje için etkinleştirilmemiş. Firebase Console\'dan etkinleştirin.';
+      } else if (err.code === 'auth/unauthorized-domain') {
+        errorMessage = 'Bu domain yetkilendirilmemiş. Firebase Console\'da authorized domains\'e ekleyin.';
+      } else if (err.message) {
+        errorMessage = `Google giriş hatası: ${err.message}`;
+      }
+      
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -52,62 +53,29 @@ export default function Login({}: LoginProps) {
     setLoading(true);
 
     try {
-      // 1. Try Firebase Auth first
-      let authUser;
-      try {
-        const result = await signInWithEmailAndPassword(auth, email, password);
-        authUser = result.user;
-      } catch (authErr: any) {
-        // If it's the hardcoded admin and they don't exist in Auth yet, create them
-        if (email === 'muhittinoz.ogs@gmail.com' && password === '123456' && authErr.code === 'auth/user-not-found') {
-          const result = await createUserWithEmailAndPassword(auth, email, password);
-          authUser = result.user;
-        } else if (email === 'muhittinoz.ogs@gmail.com' && password === '123456' && authErr.code === 'auth/invalid-credential') {
-           // Password might have changed or something, but for this specific user we want to be sure
-           // If we can't sign in with 123456, we'll fall back to Firestore check but they won't have Auth context
-        } else {
-          // For other users, we might not want to auto-create them in Auth here
-          // But we need them in Auth for rules to work.
-          // Let's try to find them in Firestore first.
-        }
-      }
-
-      // 2. Check Firestore for user profile and role
-      const q = query(collection(db, 'users'), where('email', '==', email));
-      const querySnapshot = await getDocs(q);
-
-      if (!querySnapshot.empty) {
-        const userData = querySnapshot.docs[0].data() as UserProfile;
-        
-        if (userData.password === password) {
-          // If they are in Firestore but not in Auth, create them in Auth
-          if (!authUser) {
-            try {
-              const result = await createUserWithEmailAndPassword(auth, email, password);
-              authUser = result.user;
-            } catch (createErr: any) {
-              if (createErr.code === 'auth/email-already-in-use') {
-                // This means they are in Auth but password didn't match in step 1
-                setError('Hatalı şifre.');
-                return;
-              }
-            }
-          }
-          // onLogin({ ...userData, uid: authUser?.uid || querySnapshot.docs[0].id });
-          return;
-        }
-      }
-
-      // 3. Hardcoded admin fallback (if not in Firestore yet)
-      if (email === 'muhittinoz.ogs@gmail.com' && password === '123456') {
-        // Auth state listener in App.tsx will handle the redirect
-        return;
-      }
-
-      setError('E-posta veya şifre hatalı.');
+      await signInWithEmailAndPassword(auth, email, password);
+      // Auth state listener in App.tsx will handle the redirect and authorization check
     } catch (err: any) {
-      console.error('Login error:', err);
-      setError('Giriş yapılırken bir hata oluştu: ' + (err.message || ''));
+      console.error('Email login error:', err);
+      let errorMessage = 'Giriş yapılırken bir hata oluştu.';
+      
+      if (err.code === 'auth/user-not-found') {
+        errorMessage = 'Bu e-posta adresi ile kayıtlı kullanıcı bulunamadı.';
+      } else if (err.code === 'auth/wrong-password') {
+        errorMessage = 'Hatalı şifre. Lütfen şifrenizi kontrol edin.';
+      } else if (err.code === 'auth/invalid-email') {
+        errorMessage = 'Geçersiz e-posta adresi formatı.';
+      } else if (err.code === 'auth/user-disabled') {
+        errorMessage = 'Bu hesap devre dışı bırakılmış.';
+      } else if (err.code === 'auth/too-many-requests') {
+        errorMessage = 'Çok fazla başarısız giriş denemesi. Lütfen daha sonra tekrar deneyin.';
+      } else if (err.code === 'auth/network-request-failed') {
+        errorMessage = 'Ağ bağlantısı hatası. İnternet bağlantınızı kontrol edin.';
+      } else if (err.message) {
+        errorMessage = `Giriş hatası: ${err.message}`;
+      }
+      
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }

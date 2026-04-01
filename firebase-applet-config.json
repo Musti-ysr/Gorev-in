@@ -1,10 +1,10 @@
 {
-  "projectId": "gen-lang-client-0534932709",
-  "appId": "1:785396766422:web:1e2cb221e88b2077e9db77",
-  "apiKey": "AIzaSyAtID467WJ4YQGjFIEojNRvzoQCyc7BJGE",
-  "authDomain": "gen-lang-client-0534932709.firebaseapp.com",
-  "firestoreDatabaseId": "ai-studio-dbff840f-85bc-4fa0-b7b3-64e7740688ce",
-  "storageBucket": "gen-lang-client-0534932709.firebasestorage.app",
-  "messagingSenderId": "785396766422",
-  "measurementId": ""
+  "projectId": "gorev-in",
+  "appId": "1:20915386789:web:04e132ae8f8c79bb73d04c",
+  "apiKey": "AIzaSyBUO4-VXLA-lZjUPra56HwN_03cVqz27s4",
+  "authDomain": "gorev-in.firebaseapp.com",
+  "firestoreDatabaseId": "(default)",
+  "storageBucket": "gorev-in.firebasestorage.app",
+  "messagingSenderId": "20915386789",
+  "measurementId": "G-DNLKP7V268"
 }
