@@ -1,5 +1,0 @@
-{
-  "name": "Görev-in",
-  "description": "Yönetici ve alt kullanıcılar için gelişmiş görev takip ve yönetim uygulaması. Görev atama, durum takibi, kullanıcı yönetimi, araç yönetimi (Bildir-in) ve Excel dışa aktarma özelliklerini içerir.",
-  "requestFramePermissions": []
-}
